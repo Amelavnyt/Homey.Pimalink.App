@@ -71,7 +71,10 @@ module.exports = class MyDriver extends Homey.Driver {
       const response = await pimalinkApiPost(
         webUserId,
         '/api/WebUser/Pair',
-        { name: deviceName, pairingCode }
+        {
+          name: deviceName,
+          pairingCode: pairingCode
+        }
       );
 
       let body;
@@ -91,7 +94,7 @@ module.exports = class MyDriver extends Homey.Driver {
 
 
     session.setHandler('list_devices', async () => {
-      return this.onPairListDevices(); // or inline the array
+      return this.onPairListDevices(session); // or inline the array
     });
   }
 
@@ -102,13 +105,17 @@ module.exports = class MyDriver extends Homey.Driver {
    * and the 'list_devices' view is called.
    * This should return an array with the data of devices that are available for pairing.
    */
-  async onPairListDevices() {
+  async onPairListDevices(session) {
     const webUserId = this.homey.settings.get('pimalink.webUserID');
 
     const response = await pimalinkApiPost(
       webUserId,
       '/api/WebUser/GetPairEntities',
     );
+
+    if (JSON.parse(response.body) == null) {
+      await session.prevView();
+    }
 
     let devices = []
     JSON.parse(response.body).forEach(device => {
