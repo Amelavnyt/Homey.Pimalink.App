@@ -26,5 +26,43 @@
   "author": {
     "name": "Matan Levy",
     "email": "matanlevy06@gmail.com"
-  }
+  },
+  "drivers": [
+    {
+      "name": {
+        "en": "Pimalink Device"
+      },
+      "class": "homealarm",
+      "capabilities": [
+        "homealarm_state"
+      ],
+      "platforms": [
+        "local",
+        "cloud"
+      ],
+      "connectivity": [],
+      "images": {
+        "small": "/drivers/pimalink-device/assets/images/small.png",
+        "large": "/drivers/pimalink-device/assets/images/large.png",
+        "xlarge": "/drivers/pimalink-device/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "pair"
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "id": "pimalink-device"
+    }
+  ]
 }

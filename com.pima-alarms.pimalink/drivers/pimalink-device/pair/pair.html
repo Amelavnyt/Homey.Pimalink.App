@@ -1,0 +1,162 @@
+<body>
+    <div class="container">
+
+        <div class="homey-form">
+
+            <!-- TOP FIELD -->
+            <div class="homey-form-group">
+                <label id="top_field_label" class="homey-form-label">Email</label>
+                <input id="top_field" type="text" class="homey-form-input" placeholder="Your email" required />
+            </div>
+
+            <!-- BOTTOM FIELD -->
+            <div class="homey-form-group">
+                <label id="bottom_field_label" class="homey-form-label">Phone Number</label>
+                <input id="bottom_field" type="text" class="homey-form-input" placeholder="Your phone number"
+                    required />
+            </div>
+
+            <!-- BUTTONS ROW -->
+            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button id="skip" class="homey-button-primary homey-button-block" style="width: 100%;">
+                    Skip
+                </button>
+
+                <button id="continue" class="homey-button-primary homey-button-block" style="width: 100%;">
+                    Continue
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="application/javascript">
+        (async () => {
+            const btnContinue = document.getElementById("continue");
+            const btnSkip = document.getElementById("skip");
+            const topFieldInput = document.getElementById("top_field");
+            const topFieldLabel = document.getElementById("top_field_label");
+            const BottomFieldInput = document.getElementById("bottom_field");
+            const BottomFieldLabel = document.getElementById("bottom_field_label");
+            const title = document.getElementById("title");
+
+            Homey.setTitle("User Settings");
+
+            // Fetch stored user settings from backend
+            async function getUserSettings() {
+                try {
+                    const result = await Homey.emit("get_user_settings", {});
+                    return result; // expects { email: '...', phone: '...' }
+                } catch (e) {
+                    console.error("Error fetching user settings:", e);
+                    return {};
+                }
+            }
+
+            const userSettings = await getUserSettings();
+            if (userSettings) {
+                if (userSettings.email) topFieldInput.value = userSettings.email;
+                if (userSettings.phone) BottomFieldInput.value = userSettings.phone;
+            }
+
+            let finishedUserSettings = false;
+
+            btnContinue.addEventListener("click", async () => {
+                if (!topFieldInput.value || !BottomFieldInput.value) {
+                    Homey.alert("Please fill in both fields.");
+                    return;
+                }
+
+                Homey.showLoadingOverlay();
+
+                if (!finishedUserSettings) {
+                    // User Settings Page \\
+                    const email = topFieldInput.value.trim();
+                    const phone = BottomFieldInput.value.trim();
+
+                    // Email validation
+                    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailPattern.test(email)) {
+                        Homey.alert("Please enter a valid email address.");
+                        Homey.hideLoadingOverlay();
+                        return;
+                    }
+
+                    // Phone validation: exactly 10 digits
+                    const phonePattern = /^\d{10}$/;
+                    if (!phonePattern.test(phone)) {
+                        Homey.alert("Please enter a valid 10-digit phone number.");
+                        Homey.hideLoadingOverlay();
+                        return;
+                    }
+
+                    try {
+                        const result = await Homey.emit("set_user_settings", { email, phone });
+
+                        if (result === true) {
+                            enterPairingPage();
+                            Homey.hideLoadingOverlay();
+                            return;
+                        }
+                        else {
+                            Homey.hideLoadingOverlay();
+                            Homey.alert("Invalid details, please try again.");
+                            return;
+                        }
+
+                    } catch (e) {
+                        Homey.hideLoadingOverlay();
+                        Homey.alert('Error: ' + e);
+                        return;
+                    }
+                }
+                else {
+                    // Pairing Page \\
+                    const deviceName = topFieldInput.value.trim();
+                    const pairingCode = BottomFieldInput.value.trim();
+
+                    try {
+                        const result = await Homey.emit("pair_to_webUserID", { deviceName, pairingCode });
+
+                        if (result === true) {
+                            Homey.nextView();
+                        } else {
+                            Homey.hideLoadingOverlay();
+                            Homey.alert("Error occurred, please try again.");
+                            return;
+                        }
+
+                    } catch (e) {
+                        Homey.hideLoadingOverlay();
+                        Homey.alert('Error: ' + e);
+                        return;
+                    }
+                }
+
+            });
+
+            btnSkip.addEventListener("click", async () => {
+                if (!finishedUserSettings) {
+                    enterPairingPage();
+                }
+                else {
+                    Homey.nextView();
+                }
+            });
+
+            function enterPairingPage() {
+                finishedUserSettings = true;
+                topFieldInput.value = '';
+                topFieldInput.placeholder = 'Home';
+                topFieldLabel.textContent = 'Device Name';
+                BottomFieldInput.value = '';
+                BottomFieldInput.placeholder = 'xxxxxxxxx';
+                BottomFieldLabel.textContent = 'Pairing Code';
+                Homey.setTitle("Pairing");
+            }
+
+
+
+        })();
+    </script>
+</body>
