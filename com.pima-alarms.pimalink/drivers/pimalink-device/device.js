@@ -6,10 +6,54 @@ const https = require('https');
 module.exports = class MyDevice extends Homey.Device {
 
   /**
+  * Called when the user changes the picker in the UI
+  * or when a Flow sets this capability.
+  *
+  * @param {string} value - "armed" | "disarmed" | "partially_armed"
+  * @param {object} opts
+  */
+  async onHomeAlarmStateChange(value, opts) {
+    this.log('homealarm_state ->', value, 'opts:', opts);
+
+    try {
+      
+
+
+      return;
+    } catch (err) {
+      this.error('Failed to change alarm state:', err);
+
+      // Throwing an error makes the UI revert to the previous value
+      // and shows the message to the user.
+      throw new Error('Could not reach alarm panel');
+    }
+  }
+
+  /**
    * onInit is called when the device is initialized.
    */
   async onInit() {
     this.log(this.getName() + ' has been initialized');
+
+    // Set a default if nothing is set yet
+    if (!this.getCapabilityValue('homealarm_state')) {
+      await this.setCapabilityValue('homealarm_state', 'disarmed');
+    }
+
+    // Listen for user changes from the app / Flow
+    this.registerCapabilityListener(
+      'homealarm_state',
+      this.onHomeAlarmStateChange.bind(this)
+    );
+
+    // --- ADD POLLING HERE ---
+    this._pollIntervalMs = 5 * 1000;
+    this._isPolling = false;
+
+    this._pollingInterval = setInterval(() => this.pollAlarmState(), this._pollIntervalMs);
+
+    // Run one immediate poll on boot
+    this.pollAlarmState();
   }
 
   /**
@@ -47,14 +91,25 @@ module.exports = class MyDevice extends Homey.Device {
     const name = this.getName();
     this.log(name + ' has been deleted');
 
+    // Clean up pooling
+    if (this._pollingInterval) {
+      clearInterval(this._pollingInterval);
+    }
+
     //If the device's name in "unpair" than unpair it from the WebUserId
     if (name.toLowerCase() === 'unpair') {
       const webUserId = this.homey.settings.get('pimalink.webUserID');
 
       const response = await pimalinkApiPost(
-        webUserId,
         '/api/WebUser/UnPair',
-        this.getData().id
+        {
+          "Data": this.getData().id,
+          "Header": {
+            "oSType": "2",
+            "webUserId": webUserId
+          }
+        }
+
       );
 
       if (response.statusCode === 204) {
@@ -66,19 +121,93 @@ module.exports = class MyDevice extends Homey.Device {
     }
   }
 
+  async pollAlarmState() {
+    if (this._isPolling) return; // prevent overlapping runs
+    this._isPolling = true;
+
+    try {
+      const webUserId = this.homey.settings.get('pimalink.webUserID');
+
+      const response = await pimalinkApiPost(
+        '/api/WebUser/GetNotifications',
+        {
+          "Data": false,
+          "Header": {
+            "oSType": "2",
+            "pairEntityId": this.getData().id,
+            "webUserId": webUserId
+          }
+        }
+      );
+
+      if (response.statusCode !== 200 || !response.body) {
+        this.log('pollAlarmState: bad response', JSON.parse(response.body).errorText);
+        return;
+      }
+
+      let events;
+      try {
+        events = JSON.parse(response.body);
+      } catch (err) {
+        this.error('pollAlarmState: invalid JSON', err);
+        return;
+      }
+
+      const newState = getLatestAlarmStateFromEvents(events);
+
+      if (this.getCapabilityValue('homealarm_state') !== newState) {
+        this.log('Updating state to', newState);
+        await this.setCapabilityValue('homealarm_state', newState);
+      }
+
+    } catch (err) {
+      this.error('Polling error:', err);
+    } finally {
+      this._isPolling = false;
+    }
+  }
 
 };
 
-async function pimalinkApiPost(webUserId, path, data = {}) {
+function getLatestAlarmStateFromEvents(events) {
+  if (!Array.isArray(events) || events.length === 0) return null;
+
+  for (const evt of events) {
+    const state = mapMessageToHomeAlarmState(evt.Message);
+    if (state) {
+      return state; // first relevant one = latest state
+    }
+  }
+
+  // No relevant events in this batch
+  return null;
+}
+
+function mapMessageToHomeAlarmState(message) {
+  if (!message) return null;
+
+  // Full arm
+  if (message.includes('דריכה מלאה')) {
+    return 'armed';
+  }
+
+  // Partial arm
+  if (message.includes('המערכת דרוכה לבית')) {
+    return 'partially_armed';
+  }
+
+  // System disarm
+  if (message.includes('נטרול מערכת')) {
+    return 'disarmed';
+  }
+
+  return null;
+}
+
+async function pimalinkApiPost(path, data = {}) {
   return new Promise((resolve) => {
     try {
-      const body = JSON.stringify({
-        data,
-        "header": {
-          "oSType": "2",
-          "webUserId": webUserId
-        }
-      });
+      const body = JSON.stringify(data)
 
       // Custom agent to skip TLS verification for application.pimalink.com only
       const agent = new https.Agent({
