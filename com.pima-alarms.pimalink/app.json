@@ -13,7 +13,7 @@
     "en": "Pima"
   },
   "description": {
-    "en": "Adds support for a system with Pimalink Capability"
+    "en": "Adds support for a Pima alarm system with Pimalink Capability"
   },
   "category": [
     "security"
@@ -25,8 +25,8 @@
     "xlarge": "/assets/images/xlarge.png"
   },
   "author": {
-    "name": "Matan Levy",
-    "email": "matanlevy06@gmail.com"
+    "name": "Amelavnyt",
+    "email": "amelavnyt@gmail.com"
   },
   "drivers": [
     {
