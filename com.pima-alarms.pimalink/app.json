@@ -4,12 +4,13 @@
   "version": "1.0.0",
   "compatibility": ">=12.4.0",
   "sdk": 3,
+  "brandColor": "#94200f",
   "platforms": [
     "local",
     "cloud"
   ],
   "name": {
-    "en": "Pimalink"
+    "en": "Pima"
   },
   "description": {
     "en": "Adds support for a system with Pimalink Capability"
@@ -63,7 +64,21 @@
           "template": "add_devices"
         }
       ],
-      "id": "pimalink-device"
+      "id": "pimalink-device",
+      "settings": [
+        {
+          "id": "user_code",
+          "type": "password",
+          "label": {
+            "en": "User Code"
+          },
+          "value": "0000",
+          "hint": {
+            "en": "The user code of the Panel"
+          },
+          "highlight": true
+        }
+      ]
     }
   ]
 }

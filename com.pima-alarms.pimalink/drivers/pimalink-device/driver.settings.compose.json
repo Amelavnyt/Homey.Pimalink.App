@@ -1,0 +1,10 @@
+[
+  {
+    "id": "user_code",
+    "type": "password",
+    "label": { "en": "User Code" },
+    "value": "0000",
+    "hint": { "en": "The user code of the Panel" },
+    "highlight": true
+  }
+]

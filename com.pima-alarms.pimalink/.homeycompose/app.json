@@ -3,12 +3,13 @@
   "version": "1.0.0",
   "compatibility": ">=12.4.0",
   "sdk": 3,
+  "brandColor": "#94200f",
   "platforms": [
     "local",
     "cloud"
   ],
   "name": {
-    "en": "Pimalink"
+    "en": "Pima"
   },
   "description": {
     "en": "Adds support for a system with Pimalink Capability"
@@ -23,7 +24,7 @@
     "xlarge": "/assets/images/xlarge.png"
   },
   "author": {
-    "name": "Matan Levy",
-    "email": "matanlevy06@gmail.com"
+    "name": "Amelavnyt",
+    "email": "amelavnyt@gmail.com"
   }
 }

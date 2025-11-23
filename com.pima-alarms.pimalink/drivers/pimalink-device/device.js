@@ -13,11 +13,124 @@ module.exports = class MyDevice extends Homey.Device {
   * @param {object} opts
   */
   async onHomeAlarmStateChange(value, opts) {
-    this.log('homealarm_state ->', value, 'opts:', opts);
+    this.log('homealarm_state ->', value);
 
     try {
-      
+      const webUserId = this.homey.settings.get('pimalink.webUserID');
 
+      // Authentication
+      const authResponse = await pimalinkApiPost(
+        '/api/Panel/Authenticate',
+        {
+          "data": this.getSettings().user_code,
+          "header": {
+            "oSType": "2",
+            "pairEntityId": this.getData().id,
+            "webUserId": webUserId
+          }
+        }
+
+      );
+
+      let authBody = JSON.parse(authResponse.body);
+
+      if (authResponse.statusCode !== 200) {
+        if (authBody.errorCode == 45) {
+          throw new Error('Incorrect User Code!\n Please Update in device settings');
+        }
+        else if (authBody.errorCode == 24) {
+          throw new Error('Panel Busy');
+        }
+        else if (authBody.errorCode == 21) {
+          throw new Error('Panel In Another Session');
+        }
+        else {
+          this.log(authBody);
+          throw new Error('Undefined Error');
+        }
+      }
+
+      const sessionToken = authBody.sessionToken;
+
+      if (value === 'armed') {
+        const armResponse = await pimalinkApiPost(
+          '/api/Panel/SetGeneralStatus',
+          {
+            "data": {
+              "status": 2
+            },
+            "header": {
+              "oSType": "2",
+              "pairEntityId": this.getData().id,
+              "sessionToken": sessionToken,
+              "webUserId": webUserId
+            }
+          }
+        );
+
+        if (armResponse.statusCode !== 200) {
+          // Disconnect
+          await pimalinkApiPost(
+            '/api/Panel/Disconnect',
+            {
+              "header": {
+                "oSType": "2",
+                "pairEntityId": this.getData().id,
+                "sessionToken": sessionToken,
+                "webUserId": webUserId
+              }
+            }
+          );
+          throw new Error('Error Arming');
+
+        }
+      }
+      else if (value === 'disarmed') {
+        const armResponse = await pimalinkApiPost(
+          '/api/Panel/SetGeneralStatus',
+          {
+            "data": {
+              "status": 1
+            },
+            "header": {
+              "oSType": "2",
+              "pairEntityId": this.getData().id,
+              "sessionToken": sessionToken,
+              "webUserId": webUserId
+            }
+          }
+        );
+
+        if (armResponse.statusCode !== 200) {
+          // Disconnect
+          await pimalinkApiPost(
+            '/api/Panel/Disconnect',
+            {
+              "header": {
+                "oSType": "2",
+                "pairEntityId": this.getData().id,
+                "sessionToken": sessionToken,
+                "webUserId": webUserId
+              }
+            }
+          );
+          throw new Error('Error Arming');
+
+        }
+      }
+
+      // Disconnect
+      await pimalinkApiPost(
+        '/api/Panel/Disconnect',
+        {
+          "header": {
+            "oSType": "2",
+            "pairEntityId": this.getData().id,
+            "sessionToken": sessionToken,
+            "webUserId": webUserId
+          }
+        }
+      );
 
       return;
     } catch (err) {
@@ -25,7 +138,7 @@ module.exports = class MyDevice extends Homey.Device {
 
       // Throwing an error makes the UI revert to the previous value
       // and shows the message to the user.
-      throw new Error('Could not reach alarm panel');
+      throw new Error(err.message);
     }
   }
 
@@ -103,8 +216,8 @@ module.exports = class MyDevice extends Homey.Device {
       const response = await pimalinkApiPost(
         '/api/WebUser/UnPair',
         {
-          "Data": this.getData().id,
-          "Header": {
+          "data": this.getData().id,
+          "header": {
             "oSType": "2",
             "webUserId": webUserId
           }
@@ -131,8 +244,8 @@ module.exports = class MyDevice extends Homey.Device {
       const response = await pimalinkApiPost(
         '/api/WebUser/GetNotifications',
         {
-          "Data": false,
-          "Header": {
+          "data": false,
+          "header": {
             "oSType": "2",
             "pairEntityId": this.getData().id,
             "webUserId": webUserId
@@ -204,7 +317,7 @@ function mapMessageToHomeAlarmState(message) {
   return null;
 }
 
-async function pimalinkApiPost(path, data = {}) {
+async function pimalinkApiPost(path, data) {
   return new Promise((resolve) => {
     try {
       const body = JSON.stringify(data)
